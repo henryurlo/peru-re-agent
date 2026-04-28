@@ -78,6 +78,11 @@ from starlette.types import Receive, Scope, Send
 
 from agents.coordinator import BrokerCoordinator, BrokerState
 
+try:
+    from backend.routes_demo import router as _demo_router
+except Exception:
+    _demo_router = None  # type: ignore
+
 
 # ---------------------------------------------------------------------------
 # Rate Limiting — Token Bucket
@@ -372,6 +377,54 @@ async def websocket_endpoint(websocket: WebSocket, broker_id: str):
             await websocket.receive_text()
     except WebSocketDisconnect:
         _ws_connections.pop(broker_id, None)
+
+
+# ---------------------------------------------------------------------------
+# Presentation pages
+# ---------------------------------------------------------------------------
+
+_FRONTEND_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend"
+)
+
+@app.get("/pitch", response_class=HTMLResponse)
+async def pitch_page():
+    """Landing page for client presentations."""
+    path = os.path.join(_FRONTEND_DIR, "pitch.html")
+    with open(path, encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/broker", response_class=HTMLResponse)
+async def broker_page():
+    """Mobile-first broker dashboard for client demos."""
+    path = os.path.join(_FRONTEND_DIR, "broker.html")
+    with open(path, encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/proposal", response_class=HTMLResponse)
+async def proposal_page():
+    """Printable one-page proposal template."""
+    path = os.path.join(_FRONTEND_DIR, "proposal.html")
+    with open(path, encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+
+# ---------------------------------------------------------------------------
+# Demo router
+# ---------------------------------------------------------------------------
+
+if _demo_router is not None:
+    app.include_router(_demo_router)
+
+    @app.on_event("startup")
+    async def _seed_demo_on_startup():
+        if os.getenv("DEMO_MODE", "").lower() in ("true", "1", "yes"):
+            try:
+                from backend.demo_data import seed_demo_data
+                seed_demo_data()
+                print("[startup] Demo data seeded (DEMO_MODE=true)", flush=True)
+            except Exception as exc:
+                print(f"[startup] Demo seed failed: {exc}", flush=True)
 
 
 # ---------------------------------------------------------------------------

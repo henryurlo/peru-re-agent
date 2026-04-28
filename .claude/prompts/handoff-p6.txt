@@ -1,0 +1,121 @@
+# Priority 6: Presentation Layer — Client Demo Experience
+
+## Context
+You are continuing development on the PeruRE Agent project at /home/henry/peru-re-agent. This is a production-grade, Claude-native multi-agent logistics system for a Lima real estate broker. Priorities 1-5 are complete and pushed to GitHub. The backend (FastAPI), 4 MCP microservices (maps, calendar, whatsapp, property_db), admin dashboard, and frontend are all working.
+
+## The Problem
+The current frontend (`frontend/index.html`) looks like a delivery/logistics dashboard ("Route Schedule", "Transport Mode", "Simulate Cancellation"). The user needs to present this to a friend in Peru who is a real estate sales broker. The friend will not see value in a delivery-tracking UI. The product needs to be reframed as a **real estate broker productivity system** that solves Lima-specific chaos: traffic, appointment cancellations, rescheduling, and client follow-up.
+
+## Goal
+Build a **client-ready presentation layer** that the user can confidently show to a Peruvian real estate broker. Everything must be real code, real API calls, real data — no placeholder comments, no "TODO" stubs. Spanish language (`es-PE`) for all client-facing copy.
+
+## Existing Architecture (DO NOT BREAK)
+- `backend/main.py` — FastAPI app with `/health`, `/api/v1/coordinate`, `/api/v1/batch`, `/admin`, `/admin/data`, WebSocket `/ws/broker/{id}`, MCP SSE sub-apps at `/mcp/{maps,calendar,whatsapp,property_db}`
+- `frontend/index.html` — existing logistics-themed dashboard (keep it, build new pages alongside)
+- `backend/static/admin/index.html` — admin dashboard (keep it)
+- Tests: `backend/test_main.py` (15 tests), `backend/test_priority3.py` (23 tests), `backend/test_integration.py` (49 tests) — all must still pass
+- Database: SQLite fallback + PostgreSQL/PostGIS schema in `database/schema.sql`
+- Environment: `.env` file with `ANTHROPIC_API_KEY`, `MAPBOX_TOKEN`, `DATABASE_URL`
+- Dark theme colors: `#0f172a` (bg), `#1e293b` (card), `#38bdf8` (accent blue), `#f59e0b` (accent orange/amber), `#10b981` (success green)
+
+## Deliverables
+
+### 1. Landing Page — `/pitch`
+File: `frontend/pitch.html` (also mount at `/pitch` in FastAPI)
+- Hero section: "PeruRE — El Sistema que Tu Agencia Inmobiliaria Necesita"
+- Problem section: Lima traffic chaos, cancelled appointments, lost leads
+- Solution section: AI-powered route optimization, WhatsApp follow-up, client pipeline
+- Features grid: 4 features with icons (Mapa Inteligente, Recordatorios WhatsApp, Pipeline de Clientes, Reagendamiento Automático)
+- Demo CTA button linking to `/broker`
+- Dark theme, mobile responsive, no external CSS frameworks (inline styles or `<style>` block)
+
+### 2. Mobile-First Broker Dashboard — `/broker`
+File: `frontend/broker.html` (served at `/broker`)
+- Replaces the logistics framing with real estate framing:
+  - Header: "PeruRE — Panel del Asesor" with broker name and Lima clock
+  - **Property Catalog** panel: 5 realistic Lima properties with prices in PEN (S/), photos via placeholder or Mapbox static images, neighborhood tags (Miraflores, San Isidro, Surco, Barranco, La Molina)
+  - **Client Pipeline** panel: 3 clients with status (Nuevo, En Tour, Negociación, Cerrado)
+  - **Tour Route** panel: Mapbox map with route connecting today's property visits
+  - **Quick Actions**: "Optimizar Ruta de Tours", "Enviar Recordatorio WhatsApp", "Reagendar Cita"
+  - **Approval Queue**: same pattern as existing frontend but labeled "Pendientes de Confirmación"
+- Must be touch-friendly, max-width 480px centered layout for mobile feel, but works on desktop too
+- Wires to real backend APIs (`/api/v1/coordinate`, `/api/v1/batch`, `/admin/data`, WebSocket)
+- Include a "Modo Demo" toggle that loads pre-staged demo data instantly
+
+### 3. Demo Scenario Engine
+File: `backend/demo_data.py`
+- Pre-load 5 realistic Lima real estate properties:
+  - Modern apartment Miraflores, 2 bed, S/ 450,000
+  - Colonial house Barranco, 3 bed, S/ 680,000
+  - Penthouse San Isidro, 3 bed, S/ 1,200,000
+  - Family home La Molina, 4 bed, S/ 750,000
+  - Studio Surco, 1 bed, S/ 280,000
+- Pre-load 3 clients: María G. (buyer), Carlos R. (investor), Lucía F. (first-time buyer)
+- Pre-load 2 tour routes for today and tomorrow with realistic addresses
+- Function `seed_demo_data()` that inserts into SQLite/Postgres
+- Function `reset_demo_data()` that clears and re-seeds
+
+File: `backend/routes_demo.py`
+- FastAPI router with:
+  - `POST /api/v1/demo/seed` — seeds demo data
+  - `POST /api/v1/demo/reset` — resets demo data
+  - `GET /api/v1/demo/properties` — returns demo properties
+  - `GET /api/v1/demo/clients` — returns demo clients
+  - `GET /api/v1/demo/tours` — returns demo tours
+- All endpoints return structured JSON with Spanish labels
+
+### 4. Printable Proposal Template
+File: `frontend/proposal.html` (served at `/proposal`)
+- One-page A4 printable HTML template
+- Title: "Propuesta de Servicio — PeruRE para [Nombre de la Agencia]"
+- Sections: Resumen Ejecutivo, Problema, Solución, Funcionalidades, Inversión, Próximos Pasos
+- Placeholder for agency name, date, broker name
+- Print-friendly CSS (`@media print`) — clean, professional, dark header with white body
+- "Descargar PDF" button uses `window.print()`
+
+### 5. Demo Script
+File: `DEMO_SCRIPT.md`
+- Step-by-step script for the user to walk their friend through the system
+- Includes: opening hook, problem agitation, live demo steps (landing page → broker dashboard → optimize route → send WhatsApp → show pipeline), objection handling, and close
+- Written in Spanish with English notes for the user
+- Timing: ~10 minute demo
+
+### 6. Integration
+- Update `backend/main.py` to:
+  - Mount `/pitch` → `frontend/pitch.html`
+  - Mount `/broker` → `frontend/broker.html`
+  - Mount `/proposal` → `frontend/proposal.html`
+  - Include `routes_demo.py` router under `/api/v1/demo`
+  - Call `seed_demo_data()` on startup if `DEMO_MODE=true` env var is set
+- Add `DEMO_MODE=true` to `.env` (create if missing)
+
+### 7. Tests
+File: `backend/test_priority6.py`
+- Test `GET /pitch` returns 200 and contains "PeruRE"
+- Test `GET /broker` returns 200 and contains "Panel del Asesor"
+- Test `GET /proposal` returns 200 and contains "Propuesta"
+- Test `POST /api/v1/demo/seed` creates demo data
+- Test `GET /api/v1/demo/properties` returns 5 properties
+- Test `GET /api/v1/demo/clients` returns 3 clients
+- Test `POST /api/v1/demo/reset` clears and re-seeds
+- Verify existing tests still pass: `pytest backend/test_main.py backend/test_priority3.py backend/test_integration.py -q`
+
+## Process
+1. Read `backend/main.py`, `frontend/index.html`, `database/schema.sql` to understand current state
+2. Create `backend/demo_data.py` with seed functions
+3. Create `backend/routes_demo.py` with demo endpoints
+4. Create `frontend/pitch.html`
+5. Create `frontend/broker.html`
+6. Create `frontend/proposal.html`
+7. Create `DEMO_SCRIPT.md`
+8. Update `backend/main.py` to integrate everything
+9. Run all tests, fix any failures
+10. Update `CLAUDE_HANDOFF.md` — mark Priority 6 complete
+
+## Rules
+- NO placeholder comments like "# TODO: implement this"
+- NO breaking changes to existing endpoints
+- All HTML must be self-contained (inline CSS/JS) or use minimal vanilla JS
+- Mapbox token read from `window.MAPBOX_TOKEN` injected by backend or fetched from `/admin/data`
+- Spanish copy must feel native to Peru (use "S/" for soles, "departamento" not "apartamento" where appropriate, district names correct)
+- Commit message when done: "feat: Priority 6 client demo experience — landing, broker mobile view, demo engine, proposal"

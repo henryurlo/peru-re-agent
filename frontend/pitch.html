@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="es-PE">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PeruRE — El Sistema que Tu Agencia Necesita</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --blue: #38bdf8;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --border: #334155;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; }
+
+  /* NAV */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 32px; background: rgba(15,23,42,0.92);
+    backdrop-filter: blur(12px); border-bottom: 1px solid var(--border);
+  }
+  .nav-logo { font-size: 1.4rem; font-weight: 800; color: var(--amber); letter-spacing: -0.5px; }
+  .nav-logo span { color: var(--blue); }
+  .nav-cta {
+    padding: 10px 24px; border-radius: 8px; background: var(--amber);
+    color: #0f172a; font-weight: 700; text-decoration: none; font-size: 0.95rem;
+    transition: opacity 0.2s;
+  }
+  .nav-cta:hover { opacity: 0.85; }
+
+  /* HERO */
+  .hero {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    text-align: center; padding: 120px 24px 80px;
+    background: radial-gradient(ellipse 80% 50% at 50% 20%, rgba(56,189,248,0.08) 0%, transparent 70%);
+  }
+  .hero-tag {
+    display: inline-block; padding: 6px 16px; border-radius: 20px;
+    background: rgba(56,189,248,0.12); border: 1px solid rgba(56,189,248,0.3);
+    color: var(--blue); font-size: 0.8rem; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; margin-bottom: 24px;
+  }
+  .hero h1 {
+    font-size: clamp(2rem, 6vw, 4rem); font-weight: 800; line-height: 1.15;
+    letter-spacing: -1px; margin-bottom: 24px;
+  }
+  .hero h1 em { font-style: normal; color: var(--amber); }
+  .hero-sub {
+    font-size: clamp(1rem, 2.5vw, 1.25rem); color: var(--muted);
+    max-width: 600px; margin: 0 auto 40px;
+  }
+  .hero-btns { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+  .btn-primary {
+    padding: 14px 32px; border-radius: 10px; background: var(--amber);
+    color: #0f172a; font-weight: 700; text-decoration: none; font-size: 1.05rem;
+    transition: transform 0.15s, opacity 0.15s; display: inline-block;
+  }
+  .btn-primary:hover { transform: translateY(-2px); opacity: 0.9; }
+  .btn-secondary {
+    padding: 14px 32px; border-radius: 10px; background: transparent;
+    border: 1px solid var(--border); color: var(--text); font-weight: 600;
+    text-decoration: none; font-size: 1.05rem; transition: border-color 0.2s;
+    display: inline-block;
+  }
+  .btn-secondary:hover { border-color: var(--blue); color: var(--blue); }
+
+  /* PROBLEM */
+  .section { padding: 96px 24px; }
+  .section-inner { max-width: 1100px; margin: 0 auto; }
+  .section-tag {
+    display: inline-block; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 12px;
+  }
+  .section h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 800; margin-bottom: 16px; line-height: 1.2; }
+  .section h2 em { font-style: normal; color: var(--blue); }
+  .section-lead { font-size: 1.1rem; color: var(--muted); max-width: 640px; margin-bottom: 56px; }
+
+  .problems-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+  .problem-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 28px; position: relative; overflow: hidden;
+  }
+  .problem-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, #ef4444, #f59e0b);
+  }
+  .problem-icon { font-size: 2rem; margin-bottom: 14px; }
+  .problem-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; }
+  .problem-card p { font-size: 0.9rem; color: var(--muted); }
+  .problem-stat { font-size: 1.8rem; font-weight: 800; color: #ef4444; margin-bottom: 4px; }
+
+  /* SOLUTION */
+  .solution-bg { background: linear-gradient(180deg, var(--bg) 0%, rgba(30,41,59,0.4) 100%); }
+  .solution-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
+  @media (max-width: 768px) { .solution-grid { grid-template-columns: 1fr; } }
+  .solution-text h2 { margin-bottom: 20px; }
+  .solution-text p { color: var(--muted); margin-bottom: 32px; font-size: 1.05rem; }
+  .check-list { list-style: none; display: flex; flex-direction: column; gap: 14px; }
+  .check-list li { display: flex; align-items: flex-start; gap: 12px; font-size: 0.95rem; }
+  .check-icon { color: var(--green); font-size: 1.1rem; margin-top: 1px; flex-shrink: 0; }
+  .solution-visual {
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+    padding: 32px; display: flex; flex-direction: column; gap: 16px;
+  }
+  .mock-stat { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: var(--bg); border-radius: 10px; border: 1px solid var(--border); }
+  .mock-stat-label { font-size: 0.85rem; color: var(--muted); }
+  .mock-stat-value { font-size: 1.1rem; font-weight: 700; }
+  .val-green { color: var(--green); }
+  .val-blue { color: var(--blue); }
+  .val-amber { color: var(--amber); }
+
+  /* FEATURES */
+  .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; }
+  .feature-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 28px; transition: border-color 0.2s, transform 0.2s;
+  }
+  .feature-card:hover { border-color: var(--blue); transform: translateY(-4px); }
+  .feature-icon {
+    width: 48px; height: 48px; border-radius: 12px; display: flex;
+    align-items: center; justify-content: center; font-size: 1.5rem;
+    margin-bottom: 16px;
+  }
+  .icon-blue { background: rgba(56,189,248,0.12); }
+  .icon-amber { background: rgba(245,158,11,0.12); }
+  .icon-green { background: rgba(16,185,129,0.12); }
+  .icon-purple { background: rgba(167,139,250,0.12); }
+  .feature-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 8px; }
+  .feature-card p { font-size: 0.88rem; color: var(--muted); line-height: 1.6; }
+
+  /* CTA FINAL */
+  .cta-section {
+    padding: 96px 24px; text-align: center;
+    background: radial-gradient(ellipse 60% 60% at 50% 100%, rgba(245,158,11,0.07) 0%, transparent 70%);
+  }
+  .cta-section h2 { font-size: clamp(1.8rem, 4vw, 3rem); font-weight: 800; margin-bottom: 16px; }
+  .cta-section p { color: var(--muted); font-size: 1.05rem; margin-bottom: 40px; }
+  .cta-big {
+    display: inline-flex; align-items: center; gap: 10px; padding: 18px 48px;
+    border-radius: 12px; background: var(--amber); color: #0f172a;
+    font-weight: 800; font-size: 1.1rem; text-decoration: none;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 0 40px rgba(245,158,11,0.25);
+  }
+  .cta-big:hover { transform: translateY(-3px); box-shadow: 0 8px 48px rgba(245,158,11,0.35); }
+
+  /* FOOTER */
+  footer { border-top: 1px solid var(--border); padding: 32px 24px; text-align: center; color: var(--muted); font-size: 0.85rem; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">Peru<span>RE</span></div>
+  <a href="/broker" class="nav-cta">Ver Demo en Vivo</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div>
+    <div class="hero-tag">Sistema IA para Asesores Inmobiliarios · Lima, Perú</div>
+    <h1>El Sistema que Tu<br><em>Agencia Inmobiliaria</em><br>Necesita</h1>
+    <p class="hero-sub">
+      Optimización de rutas en tiempo real, seguimiento de clientes por WhatsApp,
+      y reagendamiento automático — diseñado para el caos del tráfico limeño.
+    </p>
+    <div class="hero-btns">
+      <a href="/broker" class="btn-primary">Ver Demo en Vivo &rarr;</a>
+      <a href="#caracteristicas" class="btn-secondary">Conocer más</a>
+    </div>
+  </div>
+</section>
+
+<!-- PROBLEM -->
+<section class="section" id="problema">
+  <div class="section-inner">
+    <div class="section-tag">El Problema</div>
+    <h2>Lima te cobra tiempo<br>en cada <em>cita perdida</em></h2>
+    <p class="section-lead">
+      Cada asesor pierde en promedio 3 citas por semana por tráfico, cancelaciones de último
+      minuto y falta de seguimiento oportuno. Eso es dinero que se va sin volver.
+    </p>
+    <div class="problems-grid">
+      <div class="problem-card">
+        <div class="problem-stat">90 min</div>
+        <div class="problem-icon">🚗</div>
+        <h3>Tráfico Imposible</h3>
+        <p>20 km en Lima puede tomar 90+ minutos en hora pico. Sin optimización, llegas tarde o no llegas.</p>
+      </div>
+      <div class="problem-card">
+        <div class="problem-stat">40%</div>
+        <div class="problem-icon">📵</div>
+        <h3>Citas Canceladas</h3>
+        <p>4 de cada 10 citas se cancelan sin aviso. Sin un sistema de seguimiento, ese lead se enfría y se va a la competencia.</p>
+      </div>
+      <div class="problem-card">
+        <div class="problem-stat">3 hrs</div>
+        <div class="problem-icon">📋</div>
+        <h3>Gestión Manual</h3>
+        <p>Excel, WhatsApp, papel — cada asesor pierde 3 horas diarias en coordinación que debería ser automática.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SOLUTION -->
+<section class="section solution-bg" id="solucion">
+  <div class="section-inner">
+    <div class="solution-grid">
+      <div class="solution-text">
+        <div class="section-tag">La Solución</div>
+        <h2>IA que trabaja<br>mientras tú <em>cierras</em></h2>
+        <p>
+          PeruRE conecta mapas en tiempo real, tu agenda y WhatsApp Business
+          en un solo panel. El sistema piensa por ti — tú solo confirmas.
+        </p>
+        <ul class="check-list">
+          <li><span class="check-icon">✓</span> Ruta óptima recalculada al instante si cancela un cliente</li>
+          <li><span class="check-icon">✓</span> Recordatorios de WhatsApp enviados automáticamente</li>
+          <li><span class="check-icon">✓</span> Pipeline de clientes con estado en tiempo real</li>
+          <li><span class="check-icon">✓</span> Propiedades alternativas sugeridas cuando falla una cita</li>
+          <li><span class="check-icon">✓</span> Sin instalación — funciona en tu celular ahora mismo</li>
+        </ul>
+      </div>
+      <div class="solution-visual">
+        <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:8px;">Dashboard en Tiempo Real</div>
+        <div class="mock-stat">
+          <span class="mock-stat-label">Tours optimizados hoy</span>
+          <span class="mock-stat-value val-green">3 rutas ↑</span>
+        </div>
+        <div class="mock-stat">
+          <span class="mock-stat-label">Tiempo ahorrado</span>
+          <span class="mock-stat-value val-blue">47 min</span>
+        </div>
+        <div class="mock-stat">
+          <span class="mock-stat-label">WhatsApp enviados</span>
+          <span class="mock-stat-value val-amber">5 mensajes</span>
+        </div>
+        <div class="mock-stat">
+          <span class="mock-stat-label">Clientes en negociación</span>
+          <span class="mock-stat-value val-green">2 activos</span>
+        </div>
+        <div style="margin-top:8px;padding:14px 16px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);border-radius:10px;font-size:0.85rem;color:var(--green);">
+          ✓ Cancelación María G. detectada — ruta recalculada, WhatsApp pendiente de confirmación
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="section" id="caracteristicas">
+  <div class="section-inner">
+    <div class="section-tag">Características</div>
+    <h2>Todo lo que necesitas<br>en un solo <em>lugar</em></h2>
+    <p class="section-lead">Cuatro módulos diseñados para la realidad del mercado inmobiliario limeño.</p>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon icon-blue">🗺️</div>
+        <h3>Mapa Inteligente</h3>
+        <p>Rutas optimizadas considerando el tráfico de Lima en tiempo real. Miraflores a La Molina: siempre el camino más rápido.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon icon-amber">💬</div>
+        <h3>Recordatorios WhatsApp</h3>
+        <p>El sistema redacta y envía recordatorios a tus clientes. Tú solo apruebas con un clic — nunca más un cliente que "se olvidó".</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon icon-green">👥</div>
+        <h3>Pipeline de Clientes</h3>
+        <p>Estado de cada cliente: Nuevo, En Tour, Negociación, Cerrado. Prioriza tu energía donde más importa.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon icon-purple">🔄</div>
+        <h3>Reagendamiento Automático</h3>
+        <p>Cuando un cliente cancela, el sistema sugiere leads cercanos disponibles y recalcula tu ruta en segundos.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA FINAL -->
+<section class="cta-section">
+  <h2>Empieza hoy.<br>Tu próxima cita te espera.</h2>
+  <p>Demo completo disponible ahora mismo — sin registro, sin tarjeta.</p>
+  <a href="/broker" class="cta-big">
+    Abrir el Panel del Asesor &rarr;
+  </a>
+</section>
+
+<footer>
+  <strong style="color:var(--amber);">PeruRE</strong> — Sistema de Productividad para Asesores Inmobiliarios · Lima, Perú<br>
+  <span style="font-size:0.8rem;margin-top:6px;display:block;">Construido con IA · Diseñado para el mercado peruano</span>
+</footer>
+
+</body>
+</html>

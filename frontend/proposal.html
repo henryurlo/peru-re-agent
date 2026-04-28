@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es-PE">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Propuesta de Servicio — PeruRE</title>
+<style>
+  :root {
+    --bg: #0f172a; --card: #1e293b; --text: #e2e8f0; --muted: #94a3b8;
+    --blue: #38bdf8; --amber: #f59e0b; --green: #10b981; --border: #334155;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif; line-height:1.55;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .page {
+    max-width: 210mm; margin: 0 auto; padding: 40px 32px;
+    min-height: 297mm; display:flex; flex-direction:column;
+  }
+  .no-print {
+    position: fixed; bottom: 24px; right: 24px; z-index: 100;
+  }
+  .btn-print {
+    background: var(--amber); color: #0f172a; border: none;
+    padding: 14px 28px; border-radius: 10px; font-size: 1rem;
+    font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  .btn-print:hover { opacity: 0.9; }
+
+  /* Header */
+  .header {
+    display:flex; justify-content:space-between; align-items:flex-start;
+    border-bottom: 3px solid var(--amber); padding-bottom: 20px; margin-bottom: 24px;
+  }
+  .brand { font-size: 1.6rem; font-weight: 800; }
+  .brand span { color: var(--blue); }
+  .brand-tag { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+  .meta { text-align: right; font-size: 0.8rem; color: var(--muted); }
+  .meta strong { color: var(--text); display:block; margin-bottom:4px; }
+
+  /* Sections */
+  h2 { font-size: 1.1rem; color: var(--amber); margin: 24px 0 10px; display:flex; align-items:center; gap:8px; }
+  h2::before { content:''; display:inline-block; width:4px; height:18px; background:var(--amber); border-radius:2px; }
+  p { font-size: 0.92rem; color: var(--muted); margin-bottom: 10px; }
+
+  .grid-2 { display:grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .feature {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px; display:flex; gap: 12px; align-items:flex-start;
+  }
+  .feature-icon {
+    width: 40px; height: 40px; border-radius: 10px; background: rgba(56,189,248,0.12);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    color: var(--blue); font-size: 1.2rem;
+  }
+  .feature-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 4px; }
+  .feature-desc { font-size: 0.82rem; color: var(--muted); line-height:1.4; }
+
+  .highlight-box {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(56,189,248,0.08));
+    border: 1px solid rgba(245,158,11,0.25); border-radius: 12px;
+    padding: 20px; margin: 16px 0;
+  }
+  .highlight-box h3 { color: var(--amber); font-size: 1rem; margin-bottom: 8px; }
+  .highlight-box ul { margin: 0; padding-left: 18px; font-size: 0.88rem; color: var(--muted); }
+  .highlight-box li { margin-bottom: 6px; }
+
+  .investment {
+    display:flex; justify-content:space-between; align-items:center;
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 18px 20px; margin-top: 10px;
+  }
+  .investment-label { font-size: 0.85rem; color: var(--muted); }
+  .investment-value { font-size: 1.4rem; font-weight: 800; color: var(--green); }
+  .investment-note { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+
+  .next-steps { display:flex; gap: 12px; margin-top: 10px; flex-wrap:wrap; }
+  .step {
+    flex:1; min-width:140px; background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px; text-align:center;
+  }
+  .step-num {
+    width:28px; height:28px; border-radius:50%; background:var(--blue);
+    color:#0f172a; font-weight:800; font-size:0.85rem;
+    display:flex; align-items:center; justify-content:center; margin:0 auto 8px;
+  }
+  .step-title { font-weight:700; font-size:0.85rem; }
+  .step-desc { font-size:0.75rem; color:var(--muted); margin-top:4px; }
+
+  .footer {
+    margin-top:auto; padding-top:24px; border-top:1px solid var(--border);
+    display:flex; justify-content:space-between; align-items:center;
+    font-size:0.75rem; color:var(--muted);
+  }
+  .contact { text-align:right; }
+  .contact a { color:var(--blue); text-decoration:none; }
+
+  @media print {
+    body { background:#fff; color:#1a1a1a; }
+    .page { padding: 0; max-width: 100%; }
+    .no-print { display:none !important; }
+    .feature, .step, .investment, .highlight-box { background:#f8fafc !important; border-color:#e2e8f0 !important; }
+    .header { border-bottom-color:#f59e0b; }
+    h2 { color:#d97706; }
+    h2::before { background:#d97706; }
+    .brand span { color:#0284c7; }
+    .investment-value { color:#059669; }
+    .feature-icon { background:#e0f2fe !important; color:#0284c7 !important; }
+    .step-num { background:#0284c7 !important; color:#fff !important; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="no-print">
+    <button class="btn-print" onclick="window.print()">🖨️ Descargar PDF</button>
+  </div>
+
+  <div class="header">
+    <div>
+      <div class="brand">PE <span>PeruRE</span></div>
+      <div class="brand-tag">Tecnología Inmobiliaria para Asesores en Lima</div>
+    </div>
+    <div class="meta">
+      <strong>Propuesta de Servicio</strong>
+      Fecha: <span id="fecha"></span><br>
+      Para: <span id="cliente">[Nombre de la Agencia]</span><br>
+      Asesor: <span id="asesor">[Nombre del Broker]</span>
+    </div>
+  </div>
+
+  <h2>Resumen Ejecutivo</h2>
+  <p>
+    PeruRE es un sistema de productividad diseñado específicamente para asesores inmobiliarios en Lima.
+    Optimiza tus rutas de visitas, automatiza recordatorios por WhatsApp, gestiona tu pipeline de clientes
+    y recupera citas canceladas — todo en una sola plataforma que funciona desde tu celular.
+  </p>
+
+  <div class="highlight-box">
+    <h3>🚨 El Problema que Resolvemos</h3>
+    <ul>
+      <li>El tráfico limeño destruye tus agendas: un recorrido de 20 km puede tomar 90 minutos en hora punta.</li>
+      <li>Las cancelaciones de último momento dejan huecos imposibles de rellenar manualmente.</li>
+      <li>Perder leads por falta de seguimiento rápido cuesta comisiones de S/ 10,000 a S/ 50,000 al mes.</li>
+      <li>No hay herramientas locales que combinen mapas inteligentes + WhatsApp + CRM en uno.</li>
+    </ul>
+  </div>
+
+  <h2>Solución — Funcionalidades</h2>
+  <div class="grid-2">
+    <div class="feature">
+      <div class="feature-icon">🗺️</div>
+      <div>
+        <div class="feature-title">Mapa Inteligente con Rutas Optimizadas</div>
+        <div class="feature-desc">Calcula la mejor secuencia de visitas considerando tráfico real, horarios de siesta y distritos. Integrado con Mapbox.</div>
+      </div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📱</div>
+      <div>
+        <div class="feature-title">Recordatorios Automáticos por WhatsApp</div>
+        <div class="feature-desc">Envía confirmaciones, recordatorios y seguimientos post-visita sin escribir un mensaje. Respeta el horario 8am–8pm.</div>
+      </div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">👥</div>
+      <div>
+        <div class="feature-title">Pipeline de Clientes Visual</div>
+        <div class="feature-desc">Visualiza a tus clientes en etapas: Nuevo, En Tour, Negociación, Cerrado. Nunca pierdas un lead por inacción.</div>
+      </div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🔄</div>
+      <div>
+        <div class="feature-title">Reagendamiento Automático</div>
+        <div class="feature-desc">Si un cliente cancela, el sistema propone alternativas inmediatas: otra propiedad, otro horario, otro día. Tú solo apruebas.</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Inversión</h2>
+  <div class="investment">
+    <div>
+      <div class="investment-label">Plan Asesor Individual</div>
+      <div class="investment-note">Incluye soporte técnico, actualizaciones y capacitación inicial.</div>
+    </div>
+    <div style="text-align:right">
+      <div class="investment-value">S/ 290 / mes</div>
+      <div class="investment-note">Sin contratos de permanencia. Cancela cuando quieras.</div>
+    </div>
+  </div>
+  <p style="font-size:0.82rem; margin-top:8px;">
+    <strong>Descuento de lanzamiento:</strong> Si te unes durante la fase beta, el primer mes es S/ 149 y recibes configuración personalizada de tu zona de trabajo (Miraflores, San Isidro, Surco, Barranco, La Molina).
+  </p>
+
+  <h2>Próximos Pasos</h2>
+  <div class="next-steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-title">Demo Personalizada</div>
+      <div class="step-desc">30 minutos mostrando el sistema con tus propiedades y clientes.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-title">Configuración</div>
+      <div class="step-desc">Subimos tus propiedades, zonas de trabajo y horarios preferidos.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-title">Prueba Gratuita</div>
+      <div class="step-desc">7 días sin costo. Si no te ahorra tiempo, no pagas.</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div>© 2026 PeruRE. Tecnología construida en Lima, para Lima.</div>
+    <div class="contact">
+      contacto@perure.pe<br>
+      <a href="https://github.com/henryurlo/peru-re-agent">github.com/henryurlo/peru-re-agent</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.getElementById('fecha').textContent = new Date().toLocaleDateString('es-PE', { day:'numeric', month:'long', year:'numeric' });
+  const params = new URLSearchParams(location.search);
+  if (params.get('agencia')) document.getElementById('cliente').textContent = params.get('agencia');
+  if (params.get('asesor')) document.getElementById('asesor').textContent = params.get('asesor');
+</script>
+</body>
+</html>
