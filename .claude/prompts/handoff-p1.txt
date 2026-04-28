@@ -1,0 +1,20 @@
+You are taking over the PeruRE Agent project. Follow these instructions exactly:
+
+1. FIRST, read CLAUDE_HANDOFF.md to understand the full project state and priorities.
+2. THEN read README.md and ARCHITECTURE.md for context.
+3. THEN list the current directory structure to understand what exists.
+4. Priority 1: Build the FastAPI backend (backend/main.py) that:
+   - Serves the frontend (static files from frontend/)
+   - Mounts the 4 MCP servers (maps, calendar, whatsapp, property_db) as sub-applications or routes them correctly
+   - Provides an API endpoint POST /api/v1/coordinate that accepts a JSON payload {"broker_id": str, "instruction": str, "context": dict} and returns the coordinator agent's structured response
+   - Provides health check GET /health
+   - Uses uvicorn and fastapi
+   - Keeps all 25 existing tests in tests/test_coordinator.py passing (run pytest)
+5. If backend/ directory doesn't exist, create it.
+6. Update requirements.txt if new dependencies are needed.
+7. Write a backend/test_main.py with at least 3 FastAPI endpoint tests.
+8. Run all tests (pytest tests/ backend/test_main.py -v) and ensure they pass.
+9. Do NOT commit anything — just get the code ready.
+10. Return a summary of what files you created/modified and any issues encountered.
+
+Work autonomously. You may read, write, edit, and test code. You may run shell commands. Do not ask the user for clarification — make reasonable architectural decisions and document them in comments.

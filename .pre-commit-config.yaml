@@ -1,0 +1,74 @@
+repos:
+  # ── Code formatting ──────────────────────────────────────────────────────────
+  - repo: https://github.com/psf/black
+    rev: 24.4.2
+    hooks:
+      - id: black
+        language_version: python3
+        args: [--line-length=100]
+        files: ^(agents|backend|mcp_servers|tests)/
+
+  # ── Linting ──────────────────────────────────────────────────────────────────
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.7
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^(agents|backend|mcp_servers|tests)/
+
+  # ── General file hygiene ─────────────────────────────────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.md$
+      - id: end-of-file-fixer
+        exclude: \.md$
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      - id: detect-private-key
+      - id: no-commit-to-branch
+        args: [--branch, main]
+
+  # ── Requirements freeze check ─────────────────────────────────────────────────
+  # Warn if requirements.txt is out of date relative to installed packages.
+  # Does not block commit — just warns.
+  - repo: local
+    hooks:
+      - id: requirements-freeze-check
+        name: requirements.txt up-to-date check
+        language: python
+        entry: python -c "
+import subprocess, sys;
+result = subprocess.run(['pip', 'check'], capture_output=True, text=True);
+if result.returncode != 0:
+    print('pip check failed — dependency conflicts detected:');
+    print(result.stdout);
+    print(result.stderr);
+    sys.exit(1)
+"
+        pass_filenames: false
+        always_run: false
+        files: requirements\.txt$
+
+  # ── Pytest smoke test ─────────────────────────────────────────────────────────
+  # Runs a fast subset of tests on every commit. Full suite runs in CI.
+  - repo: local
+    hooks:
+      - id: pytest-smoke
+        name: pytest smoke test
+        language: python
+        entry: python -m pytest tests/test_coordinator.py -q --tb=line -x
+        pass_filenames: false
+        always_run: false
+        stages: [pre-commit]
+        additional_dependencies:
+          - pytest>=8.2.0
+          - anthropic>=0.28.0
+          - pydantic>=2.7.0
+          - python-dotenv>=1.0.0

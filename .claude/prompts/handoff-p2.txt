@@ -1,0 +1,40 @@
+You are taking over the PeruRE Agent project for Priority 2. Read CLAUDE_HANDOFF.md first for full context.
+
+CURRENT STATE:
+- backend/main.py exists with /health, /api/v1/coordinate, MCP SSE mounts, static frontend serving
+- backend/test_main.py has 15 tests (all passing)
+- tests/test_coordinator.py has 25 tests (all passing)
+- 40 total tests passing
+
+PRIORITY 2 TASKS (do all of these):
+
+1. Add python-dotenv loading to backend/main.py so it reads ANTHROPIC_API_KEY, MAPBOX_TOKEN, DB_URL from .env file at startup. Fail gracefully with clear error messages if keys are missing.
+
+2. Create scripts/start_server.sh that:
+   - Checks for .env file, creates .env.example if missing
+   - Sources venv
+   - Sets PYTHONPATH to project root
+   - Starts uvicorn on port 8000 with sensible defaults
+   - Make it executable (chmod +x)
+
+3. Wire the frontend (frontend/index.html) to the real backend API:
+   - Replace mock data with fetch() calls to /api/v1/coordinate
+   - Add a simple form where broker can type an instruction and see the response
+   - Show loading state while waiting for API
+   - Display structured response (action_plan, findings, requires_approval)
+   - Keep the Mapbox map visualization for route display
+   - Add a "Simulate Cancellation" button that sends the demo scenario
+
+4. Update docker-compose.yml to:
+   - Build the backend from the new Dockerfile
+   - Pass environment variables from .env
+   - Ensure frontend static files are served correctly
+   - Add a healthcheck on the backend container
+
+5. Create backend/Dockerfile if it doesn't exist
+
+6. Run all tests (pytest tests/ backend/test_main.py -v) and ensure they still pass.
+
+7. Do NOT commit anything. Return a summary of files created/modified.
+
+Work autonomously. Make reasonable decisions. Document in comments.

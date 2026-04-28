@@ -81,9 +81,11 @@
             <div class="panel">
                 <h3>Acción Rápida</h3>
                 <div class="chat-input">
-                    <input type="text" id="broker-msg" placeholder='Ej: "Maria G. canceló, estoy en Miraflores"'>
-                    <button onclick="sendToCoordinator()">➡️</button>
+                    <input type="text" id="broker-msg" placeholder='Ej: "Maria G. canceló, estoy en Miraflores"' onkeydown="if(event.key==='Enter')sendToCoordinator()">
+                    <button id="send-btn" onclick="sendToCoordinator()">➡️</button>
                 </div>
+                <button class="action-btn secondary" style="margin-top:8px" onclick="simulateCancellation()">⚠️ Simulate Cancellation</button>
+                <div id="coordinator-response" style="margin-top:10px;display:none;"></div>
                 <div id="approval-queue"></div>
             </div>
         </div>
@@ -282,53 +284,178 @@ function setMode(mode) {
 }
 
 // ------------------------------------------------------------------
-// Coordinator Integration
+// Coordinator Integration — real API calls to /api/v1/coordinate
 // ------------------------------------------------------------------
-function sendToCoordinator() {
-    const msg = document.getElementById('broker-msg').value;
-    if (!msg.trim()) return;
-    
-    // In production, POST to coordinator API
-    console.log('Sending to coordinator:', msg);
-    
-    // Simulate coordinator response requiring approval
-    const approvalHTML = `
-        <div class="approval-box">
-            <p><b>Coordinador sugiere:</b> Enviar WhatsApp a <i>Carlos R.</i> proponiendo reunión a las 15:30 en Miraflores.</p>
-            <div class="approval-btns">
-                <button class="btn-yes" onclick="approveAction()">Sí, enviar</button>
-                <button class="btn-no" onclick="rejectAction()">No</button>
-            </div>
-        </div>
-    `;
-    document.getElementById('approval-queue').innerHTML = approvalHTML;
-    document.getElementById('broker-msg').value = '';
+
+const BROKER_ID = 'broker-demo-001';
+
+function setLoading(loading) {
+    const btn = document.getElementById('send-btn');
+    const responseEl = document.getElementById('coordinator-response');
+    if (loading) {
+        btn.disabled = true;
+        btn.textContent = '⏳';
+        responseEl.style.display = 'block';
+        responseEl.innerHTML = `<div style="color:var(--muted);font-size:0.85rem;padding:8px;">Coordinando con el agente...</div>`;
+    } else {
+        btn.disabled = false;
+        btn.textContent = '➡️';
+    }
 }
 
-function approveAction() {
-    alert('WhatsApp enviado vía Business API');
-    document.getElementById('approval-queue').innerHTML = '';
+function renderCoordinatorResponse(data) {
+    const responseEl = document.getElementById('coordinator-response');
+    const statusColor = data.status === 'success' ? 'var(--accent2)' : data.status === 'partial' ? 'var(--accent)' : 'var(--danger)';
+
+    let html = `<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:0.85rem;">`;
+    html += `<div style="color:${statusColor};font-weight:700;margin-bottom:8px;">● ${(data.status || 'unknown').toUpperCase()}</div>`;
+
+    if (data.action_plan && data.action_plan.length) {
+        html += `<div style="color:var(--muted);font-size:0.75rem;margin-bottom:4px;">PLAN DE ACCIÓN</div>`;
+        html += `<ul style="margin-left:16px;margin-bottom:8px;">`;
+        data.action_plan.forEach(step => { html += `<li>${step}</li>`; });
+        html += `</ul>`;
+    }
+
+    if (data.findings && data.findings.length) {
+        html += `<div style="color:var(--muted);font-size:0.75rem;margin-bottom:4px;">HALLAZGOS</div>`;
+        data.findings.forEach(f => {
+            const conf = f.confidence === 'high' ? 'var(--accent2)' : f.confidence === 'medium' ? 'var(--accent)' : 'var(--muted)';
+            html += `<div style="margin-bottom:4px;padding:6px;background:rgba(255,255,255,0.03);border-radius:6px;">`;
+            html += `<span style="color:${conf};font-size:0.7rem;">[${f.confidence || '?'}]</span> ${f.claim}`;
+            if (f.source) html += ` <span style="color:var(--muted);font-size:0.7rem;">— ${f.source}</span>`;
+            html += `</div>`;
+        });
+    }
+
+    if (data.coverage_gaps && data.coverage_gaps.length) {
+        html += `<div style="color:var(--danger);font-size:0.75rem;margin-top:6px;">Gaps: ${data.coverage_gaps.join(', ')}</div>`;
+    }
+
+    if (data.error) {
+        html += `<div style="color:var(--danger);margin-top:6px;">Error: ${data.error}</div>`;
+    }
+
+    html += `</div>`;
+    responseEl.innerHTML = html;
+    responseEl.style.display = 'block';
+
+    // If coordinator requires approval, show approval queue
+    if (data.requires_approval && data.approval_items && data.approval_items.length) {
+        renderApprovalQueue(data.approval_items);
+    }
+
+    // If response includes route geometry, draw it on the map
+    if (data.route_geometry) {
+        drawRoute(data.route_geometry);
+    }
 }
-function rejectAction() {
+
+function renderApprovalQueue(items) {
+    const queue = document.getElementById('approval-queue');
+    queue.innerHTML = items.map((item, i) => `
+        <div class="approval-box" id="approval-${i}">
+            <p><b>Coordinador sugiere:</b> ${item.description || JSON.stringify(item)}</p>
+            <div class="approval-btns">
+                <button class="btn-yes" onclick="approveAction(${i})">Sí, enviar</button>
+                <button class="btn-no" onclick="rejectAction(${i})">No</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function sendToCoordinator(instruction) {
+    const input = document.getElementById('broker-msg');
+    const msg = instruction || input.value.trim();
+    if (!msg) return;
+
+    setLoading(true);
     document.getElementById('approval-queue').innerHTML = '';
+    if (!instruction) input.value = '';
+
+    try {
+        const res = await fetch('/api/v1/coordinate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                broker_id: BROKER_ID,
+                instruction: msg,
+                context: {
+                    broker_state: {
+                        current_location: { lat: brokerLocation[1], lng: brokerLocation[0] },
+                        confirmed_appointments_today: appointments.map(a => ({
+                            client_id: a.id,
+                            time: a.time,
+                            district: a.address.split(',').pop().trim()
+                        })),
+                        pending_proposals: [],
+                        active_concerns: [],
+                        last_updated: new Date().toISOString()
+                    }
+                }
+            })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            renderCoordinatorResponse({
+                status: 'error',
+                error: data.detail || `HTTP ${res.status}`,
+                findings: [],
+                action_plan: []
+            });
+        } else {
+            renderCoordinatorResponse(data);
+        }
+    } catch (err) {
+        renderCoordinatorResponse({
+            status: 'error',
+            error: `Network error: ${err.message}. Is the backend running on port 8000?`,
+            findings: [],
+            action_plan: []
+        });
+    } finally {
+        setLoading(false);
+    }
+}
+
+function simulateCancellation() {
+    // Removes first appointment from the local list, re-optimizes the map route,
+    // then sends the cancellation scenario to the coordinator agent.
+    if (appointments.length > 0) {
+        const cancelled = appointments.shift();
+        renderRouteList();
+        if (map.getSource('route')) {
+            try { map.removeLayer('route-line'); } catch (_) {}
+        }
+        optimizeRoutes();
+    }
+
+    const scenario = (
+        'Mi cita de las 10am en San Borja fue cancelada. ' +
+        'Estoy en Miraflores. ' +
+        'Por favor re-optimiza mi ruta y encuentra los leads más cercanos disponibles hoy.'
+    );
+    document.getElementById('broker-msg').value = scenario;
+    sendToCoordinator(scenario);
+}
+
+function approveAction(index) {
+    const el = document.getElementById(`approval-${index}`);
+    if (el) {
+        el.innerHTML = '<div style="color:var(--accent2);font-size:0.85rem;padding:6px;">✓ WhatsApp enviado vía Business API</div>';
+        setTimeout(() => el.remove(), 3000);
+    }
+}
+
+function rejectAction(index) {
+    const el = document.getElementById(`approval-${index}`);
+    if (el) el.remove();
 }
 
 function reoptimizeAfterCancel() {
-    // Remove first appointment as demo
-    appointments.shift();
-    renderRouteList();
-    // Clear old route and re-optimize
-    if (map.getSource('route')) map.removeLayer('route-line');
-    optimizeRoutes();
-    
-    // Show simulated alternative leads
-    const panel = document.getElementById('route-list');
-    panel.innerHTML += `
-        <div style="margin-top:12px;padding:10px;background:rgba(16,185,129,0.1);border-radius:8px;border:1px solid var(--accent2);">
-            <div style="font-size:0.8rem;color:var(--accent2);font-weight:700;">OPORTUNIDADES CERCANAS</div>
-            <div style="font-size:0.85rem;margin-top:6px;">• Pedro M. (Surco, 12 min) — Score 82<br>• Laura T. (San Borja, 8 min) — Score 76</div>
-        </div>
-    `;
+    simulateCancellation();
 }
 </script>
 </body>

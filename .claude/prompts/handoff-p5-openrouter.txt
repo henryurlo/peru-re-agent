@@ -1,0 +1,60 @@
+You are an AI assistant taking over the PeruRE Agent project for Priority 5 (FINAL). This prompt is being executed via OpenRouter as a fallback.
+
+CURRENT STATE:
+- 112/112 tests passing across all test suites
+- Full FastAPI backend with real Mapbox, WhatsApp, PostgreSQL integrations
+- SQLite fallback for dev, cache layer, rate limiting, admin dashboard, WebSocket
+- All 5 Claude certification domains proven in ARCHITECTURE.md
+
+PRIORITY 5 TASKS (do all of these):
+
+1. Write comprehensive DEPLOYMENT.md covering:
+   - Docker deployment step-by-step
+   - Environment variables reference table
+   - Database migrations (how to run schema.sql)
+   - SSL/certbot setup for production
+   - Monitoring: health checks, log aggregation, Prometheus metrics
+   - Backup strategy for PostgreSQL
+   - Troubleshooting common issues
+
+2. Add GitHub Actions CI/CD workflow at .github/workflows/ci.yml that:
+   - Runs pytest on every push and PR
+   - Builds Docker image
+   - Runs security scan (bandit, safety)
+   - Caches pip dependencies
+   - Only deploys to staging on main branch merge
+
+3. Create a Makefile with targets:
+   - make test — run all tests
+   - make run — start dev server with auto-reload
+   - make docker-build — build production image
+   - make docker-up — docker-compose up -d
+   - make docker-down — docker-compose down
+   - make lint — run black, ruff, mypy
+   - make format — auto-format code
+   - make clean — remove pycache, build artifacts
+   - make init — create .env from .env.example, install deps
+
+4. Add pre-commit hooks configuration (.pre-commit-config.yaml) with:
+   - black code formatting
+   - ruff linting
+   - pytest smoke test
+   - trailing-whitespace, end-of-file-fixer
+   - requirements.txt freeze check
+
+5. Update README.md to be production-ready:
+   - Clear setup instructions (git clone → make init → make run)
+   - Architecture diagram reference (point to ARCHITECTURE.md)
+   - API endpoint reference table
+   - Environment variables table
+   - Contributing guide (point to Makefile and tests)
+   - License section (MIT)
+   - Badges placeholder (CI, tests, Docker)
+
+6. Final test run — all 112 tests must pass.
+
+7. Update CLAUDE_HANDOFF.md to reflect final state and mark all priorities complete.
+
+8. Do NOT commit anything. Return a final summary.
+
+Work autonomously. Make excellent documentation. This is the final polish before handoff.

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PeruRE Admin Dashboard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0f172a; color: #e2e8f0; font-family: 'Courier New', monospace; padding: 24px; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; border-bottom: 1px solid #1e293b; padding-bottom: 16px; }
+    h1 { color: #38bdf8; font-size: 1.4em; letter-spacing: 1px; }
+    .subtitle { color: #475569; font-size: 0.8em; margin-top: 2px; }
+    h2 { color: #94a3b8; font-size: 0.75em; text-transform: uppercase; letter-spacing: 3px; margin: 28px 0 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82em; }
+    th { color: #475569; padding: 6px 12px; text-align: left; border-bottom: 1px solid #1e293b; font-weight: normal; }
+    td { padding: 6px 12px; border-bottom: 1px solid #0f1e33; color: #cbd5e1; }
+    tr:hover td { background: #1e293b; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 0.8em; font-weight: bold; }
+    .green  { background: #14532d; color: #4ade80; }
+    .red    { background: #450a0a; color: #f87171; }
+    .ok     { background: #1e3a5f; color: #38bdf8; }
+    .err    { background: #450a0a; color: #f87171; }
+    .warn   { background: #451a03; color: #fb923c; }
+    .mcp-grid { display: flex; gap: 12px; flex-wrap: wrap; }
+    .mcp-card { background: #1e293b; border-radius: 6px; padding: 12px 20px; display: flex; align-items: center; gap: 10px; }
+    .mcp-name { color: #94a3b8; font-size: 0.85em; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .dot-green { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
+    .dot-red   { background: #f87171; box-shadow: 0 0 6px #f87171; }
+    .btn { cursor: pointer; color: #38bdf8; background: transparent; border: 1px solid #1e3a5f; padding: 6px 14px; border-radius: 4px; font-family: inherit; font-size: 0.82em; transition: background 0.15s; }
+    .btn:hover { background: #1e3a5f; }
+    .empty { color: #334155; font-size: 0.85em; padding: 12px 0; }
+    .stat { background: #1e293b; border-radius: 6px; padding: 10px 16px; display: inline-block; margin-right: 10px; }
+    .stat-val { color: #38bdf8; font-size: 1.4em; font-weight: bold; }
+    .stat-label { color: #475569; font-size: 0.75em; margin-top: 2px; }
+    #last-refresh { color: #334155; font-size: 0.75em; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>PeruRE Admin Dashboard</h1>
+      <div class="subtitle">Real-time broker logistics system monitor</div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <span id="last-refresh"></span>
+      <button class="btn" onclick="loadData()">↻ Refresh</button>
+    </div>
+  </header>
+
+  <h2>MCP Server Health</h2>
+  <div id="mcp-health" class="mcp-grid"><span class="empty">Loading…</span></div>
+
+  <h2>Broker Activity</h2>
+  <div id="broker-stats"></div>
+  <div id="broker-activity"><span class="empty">Loading…</span></div>
+
+  <h2>Recent Requests <span style="color:#334155;font-size:0.8em">(last 50, newest first)</span></h2>
+  <div id="recent-requests"><span class="empty">Loading…</span></div>
+
+  <script>
+    async function loadData() {
+      try {
+        const res = await fetch('/admin/data');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const d = await res.json();
+
+        // MCP Health
+        const mcp = document.getElementById('mcp-health');
+        const entries = Object.entries(d.mcp_health);
+        mcp.innerHTML = entries.length === 0
+          ? '<span class="empty">No MCP servers configured.</span>'
+          : entries.map(([name, ok]) => `
+            <div class="mcp-card">
+              <div class="dot ${ok ? 'dot-green' : 'dot-red'}"></div>
+              <span class="mcp-name">${name}</span>
+              <span class="badge ${ok ? 'green' : 'red'}">${ok ? 'up' : 'down'}</span>
+            </div>`).join('');
+
+        // Broker stats
+        const brokerEntries = Object.entries(d.broker_activity);
+        const totalReq = brokerEntries.reduce((s, [, c]) => s + c, 0);
+        document.getElementById('broker-stats').innerHTML = `
+          <div class="stat"><div class="stat-val">${brokerEntries.length}</div><div class="stat-label">Active Brokers</div></div>
+          <div class="stat"><div class="stat-val">${totalReq}</div><div class="stat-label">Total Requests</div></div>
+        `;
+
+        // Broker Activity table
+        const actDiv = document.getElementById('broker-activity');
+        actDiv.innerHTML = brokerEntries.length === 0
+          ? '<p class="empty">No broker activity recorded yet.</p>'
+          : `<table>
+               <tr><th>Broker ID</th><th>Requests</th><th>Share</th></tr>
+               ${brokerEntries.sort((a,b)=>b[1]-a[1]).map(([id, count]) => `
+                 <tr>
+                   <td>${id}</td>
+                   <td>${count}</td>
+                   <td><div style="background:#1e293b;border-radius:3px;overflow:hidden;width:120px;height:6px">
+                     <div style="background:#38bdf8;width:${Math.round(count/totalReq*100)}%;height:100%"></div>
+                   </div></td>
+                 </tr>`).join('')}
+             </table>`;
+
+        // Recent Requests
+        const reqDiv = document.getElementById('recent-requests');
+        const reqs = d.recent_requests;
+        reqDiv.innerHTML = reqs.length === 0
+          ? '<p class="empty">No requests logged yet.</p>'
+          : `<table>
+               <tr><th>Time (UTC)</th><th>Method</th><th>Path</th><th>Status</th><th>Duration</th><th>Broker</th></tr>
+               ${[...reqs].reverse().map(r => {
+                 const sc = r.status_code;
+                 const cls = sc < 400 ? 'ok' : sc < 500 ? 'warn' : 'err';
+                 const ts = r.timestamp ? r.timestamp.substring(11, 23) : '?';
+                 return `<tr>
+                   <td>${ts}</td>
+                   <td>${r.method}</td>
+                   <td>${r.path}</td>
+                   <td><span class="badge ${cls}">${sc}</span></td>
+                   <td>${r.duration_ms}ms</td>
+                   <td>${r.broker_id || '<span style="color:#334155">—</span>'}</td>
+                 </tr>`;
+               }).join('')}
+             </table>`;
+
+        document.getElementById('last-refresh').textContent =
+          'Updated ' + new Date().toLocaleTimeString();
+      } catch (e) {
+        document.getElementById('mcp-health').innerHTML =
+          `<span class="badge err">Error: ${e.message}</span>`;
+      }
+    }
+
+    loadData();
+    setInterval(loadData, 5000);
+  </script>
+</body>
+</html>

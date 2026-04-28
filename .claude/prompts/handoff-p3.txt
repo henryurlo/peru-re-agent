@@ -1,0 +1,38 @@
+You are taking over the PeruRE Agent project for Priority 3. Read CLAUDE_HANDOFF.md first for full context.
+
+CURRENT STATE:
+- Full FastAPI backend with /health, /api/v1/coordinate, MCP SSE mounts
+- Frontend wired to backend API with fetch(), loading states, approval queue
+- backend/test_main.py has 15 tests (all passing)
+- tests/test_coordinator.py has 25 tests (all passing)
+- 40 total tests passing
+- dotenv loading, Dockerfile, docker-compose all working
+
+PRIORITY 3 TASKS (do all of these):
+
+1. Add a POST /api/v1/batch endpoint that accepts a list of broker instructions and runs them through the coordinator in parallel using asyncio.gather. Request body: {"broker_id": str, "instructions": [str], "context": dict}. Return a list of coordinator results in the same order.
+
+2. Implement rate limiting on /api/v1/coordinate and /api/v1/batch using a simple in-memory token bucket (10 requests per minute per broker_id, burst of 3). Use @lru_cache for broker_id buckets. Return 429 with Retry-After header when limit exceeded.
+
+3. Add request/response logging middleware — log every request as structured JSON to stdout with timestamp, method, path, broker_id, status_code, duration_ms.
+
+4. Create a simple admin dashboard at /admin (served as static HTML from backend/static/admin/index.html) that shows:
+   - Recent requests table (last 50, from an in-memory ring buffer in the middleware)
+   - Broker activity summary (request counts per broker_id)
+   - MCP server health status (try to connect to each /mcp/{name}/sse and show green/red)
+   - No database needed — keep it in-memory for now.
+
+5. Add WebSocket endpoint /ws/broker/{broker_id} for real-time updates. When a broker submits a request, broadcast the result to their WebSocket connection. Keep connections in an in-memory dict.
+
+6. Write backend/test_priority3.py with tests covering:
+   - Batch endpoint returns correct number of results
+   - Rate limit returns 429 after 10 requests
+   - Retry-After header present on 429
+   - Admin dashboard HTML served at /admin
+   - WebSocket connection accepted at /ws/broker/{id}
+
+7. Run ALL tests (pytest tests/ backend/test_main.py backend/test_priority3.py -v) and ensure they pass.
+
+8. Do NOT commit anything. Return a summary of files created/modified.
+
+Work autonomously. Make reasonable architectural decisions. Document in comments.

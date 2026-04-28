@@ -4,20 +4,73 @@ MCP Server: Peru Maps & Routing
 Exposes Mapbox Directions + Traffic APIs via MCP tools.
 Demonstrates: Tool descriptions, structured errors, MCP server configuration
 (Domain 2: Tool Design & MCP Integration).
+
+Priority 4 additions:
+- In-memory route cache with 5-min TTL keyed by origin+destinations+profile
+- Cache hit/miss ratio logging via Python logger
+- clear_route_cache() tool for manual invalidation
+- Graceful degradation when MAPBOX_TOKEN is absent (returns placeholder data)
 """
 
-import os
+import hashlib
 import json
+import logging
+import os
+import time
+from typing import Any, Dict, List, Optional, Tuple
+
 import requests
-from typing import Any, Dict, List, Optional
 from mcp.server import Server
-from mcp.types import Tool, TextContent, ErrorData
+from mcp.types import ErrorData, TextContent, Tool
 
 app = Server("peru_maps")
+logger = logging.getLogger(__name__)
 
 MAPBOX_TOKEN = os.environ.get("MAPBOX_TOKEN", "")
 GOOGLE_MAPS_KEY = os.environ.get("GOOGLE_MAPS_API_KEY", "")
 
+# ── Route cache ────────────────────────────────────────────────────────────────
+# Simple in-memory dict: cache_key → (result_dict, insertion_monotonic_time)
+_CACHE_TTL: int = 300  # seconds (5 minutes)
+_route_cache: Dict[str, Tuple[Dict[str, Any], float]] = {}
+_cache_stats: Dict[str, int] = {"hits": 0, "misses": 0}
+
+
+def _cache_key(*parts: Any) -> str:
+    payload = json.dumps(parts, sort_keys=True, default=str)
+    return hashlib.md5(payload.encode()).hexdigest()
+
+
+def _cache_get(key: str) -> Optional[Dict[str, Any]]:
+    entry = _route_cache.get(key)
+    if entry:
+        result, ts = entry
+        if time.monotonic() - ts < _CACHE_TTL:
+            _cache_stats["hits"] += 1
+            total = _cache_stats["hits"] + _cache_stats["misses"]
+            logger.info("route_cache hit  key=%s  ratio=%d/%d", key[:8], _cache_stats["hits"], total)
+            return result
+        del _route_cache[key]
+    _cache_stats["misses"] += 1
+    total = _cache_stats["hits"] + _cache_stats["misses"]
+    logger.info("route_cache miss key=%s  ratio=%d/%d", key[:8], _cache_stats["hits"], total)
+    return None
+
+
+def _cache_set(key: str, result: Dict[str, Any]) -> None:
+    _route_cache[key] = (result, time.monotonic())
+
+
+def _clear_route_cache() -> Dict[str, Any]:
+    count = len(_route_cache)
+    _route_cache.clear()
+    _cache_stats["hits"] = 0
+    _cache_stats["misses"] = 0
+    logger.info("route cache cleared: %d entries removed", count)
+    return {"status": "success", "cleared_entries": count, "cache_stats_reset": True}
+
+
+# ── Tool list ──────────────────────────────────────────────────────────────────
 
 @app.list_tools()
 async def list_tools() -> List[Tool]:
@@ -102,9 +155,20 @@ async def list_tools() -> List[Tool]:
                 },
                 "required": ["district"]
             }
-        )
+        ),
+        Tool(
+            name="clear_route_cache",
+            description=(
+                "Clears the in-memory route cache and resets hit/miss stats. "
+                "Use when route data may be stale or after a significant change in traffic conditions. "
+                "Cache entries also expire automatically after 5 minutes (TTL)."
+            ),
+            inputSchema={"type": "object", "properties": {}}
+        ),
     ]
 
+
+# ── Tool dispatch ──────────────────────────────────────────────────────────────
 
 @app.call_tool()
 async def call_tool(name: str, arguments: Any) -> List[TextContent]:
@@ -115,101 +179,153 @@ async def call_tool(name: str, arguments: Any) -> List[TextContent]:
             return [TextContent(type="text", text=json.dumps(_single_eta(arguments), indent=2))]
         elif name == "get_traffic_conditions":
             return [TextContent(type="text", text=json.dumps(_traffic_conditions(arguments), indent=2))]
+        elif name == "clear_route_cache":
+            return [TextContent(type="text", text=json.dumps(_clear_route_cache(), indent=2))]
         else:
             return _error_response("validation", False, f"Unknown tool: {name}")
     except requests.exceptions.Timeout:
         return _error_response("transient", True, "Mapbox API timeout. Retry with cached typical-traffic estimate.")
     except requests.exceptions.ConnectionError:
         return _error_response("transient", True, "Network error connecting to Mapbox. Check connectivity.")
+    except requests.exceptions.HTTPError as e:
+        status = e.response.status_code if e.response is not None else 0
+        if status == 401:
+            return _error_response("auth", False, "Mapbox token invalid or expired. Check MAPBOX_TOKEN.")
+        if status == 422:
+            return _error_response("validation", False, "Mapbox rejected coordinates. Verify lat/lng values.")
+        if status == 429:
+            return _error_response("transient", True, "Mapbox rate limit exceeded. Retry in a few seconds.")
+        return _error_response("transient", True, f"Mapbox HTTP {status} error.")
     except Exception as e:
         return _error_response("transient", False, f"Unexpected error: {str(e)}")
 
+
+# ── Route calculation ──────────────────────────────────────────────────────────
 
 def _calculate_route(args: Dict[str, Any]) -> Dict[str, Any]:
     origin = args["origin"]
     destinations = args["destinations"]
     mode = args.get("mode", "driving")
-    
+    profile = "mapbox/walking" if mode == "transit" else f"mapbox/{'driving' if mode == 'taxi' else mode}"
+
+    # Include mode (not just profile) because taxi adds a fare estimate that driving omits
+    key = _cache_key(origin["lat"], origin["lng"], [(d["lat"], d["lng"]) for d in destinations], mode, profile)
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached
+
+    # Graceful degradation: return placeholder when no token is configured
+    token = os.environ.get("MAPBOX_TOKEN", "")
+    if not token:
+        logger.warning("MAPBOX_TOKEN not set — returning mock route data")
+        result = _mock_route_response(origin, destinations, mode)
+        _cache_set(key, result)
+        return result
+
     coords = [f"{origin['lng']},{origin['lat']}"] + [f"{d['lng']},{d['lat']}" for d in destinations]
     waypoints = ";".join(coords)
-    
-    profile = "mapbox/walking" if mode == "transit" else f"mapbox/{mode if mode != 'taxi' else 'driving'}"
+
     url = f"https://api.mapbox.com/directions/v5/{profile}/{waypoints}"
     params = {
-        "access_token": MAPBOX_TOKEN,
+        "access_token": token,
         "geometries": "geojson",
         "overview": "full",
         "annotations": "duration,distance",
-        "alternatives": "true" if args.get("alternatives", True) else "false"
+        "alternatives": "true" if args.get("alternatives", True) else "false",
     }
-    
+
     resp = requests.get(url, params=params, timeout=15)
     resp.raise_for_status()
     data = resp.json()
-    
+
     if not data.get("routes"):
         return _error_dict("validation", False, "No route found between points. Verify coordinates.")
-    
+
     route = data["routes"][0]
     legs = []
     for i, leg in enumerate(route["legs"]):
-        start_name = origin["name"] if i == 0 else destinations[i-1]["name"]
-        end_name = destinations[i]["name"] if i < len(destinations) else origin["name"]
+        start_name = origin.get("name", f"Point {i}") if i == 0 else destinations[i - 1]["name"]
+        end_name = destinations[i]["name"] if i < len(destinations) else origin.get("name", "Origin")
         legs.append({
             "from": {"name": start_name, "lat": float(coords[i].split(",")[1]), "lng": float(coords[i].split(",")[0])},
-            "to": {"name": end_name, "lat": float(coords[i+1].split(",")[1]), "lng": float(coords[i+1].split(",")[0])},
+            "to": {"name": end_name, "lat": float(coords[i + 1].split(",")[1]), "lng": float(coords[i + 1].split(",")[0])},
             "duration_minutes": round(leg["duration"] / 60, 1),
             "distance_km": round(leg["distance"] / 1000, 2),
             "traffic_condition": _classify_traffic(leg["duration"], leg["distance"]),
-            "geometry": leg.get("geometry", {})
+            "geometry": leg.get("geometry", {}),
         })
-    
+
     total_min = sum(l["duration_minutes"] for l in legs)
     total_km = sum(l["distance_km"] for l in legs)
-    
-    result = {
+
+    result: Dict[str, Any] = {
         "mode": mode,
         "total_duration_minutes": round(total_min, 1),
         "total_distance_km": round(total_km, 2),
         "legs": legs,
         "risk_flags": _generate_risk_flags(total_min, destinations),
         "geometry": route["geometry"],
-        "mapbox_url": f"https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/geojson({json.dumps(route['geometry'])})/auto/800x600?access_token={MAPBOX_TOKEN[:8]}..."
+        "mapbox_url": (
+            f"https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/"
+            f"geojson({json.dumps(route['geometry'])})/auto/800x600"
+            f"?access_token={token[:8]}..."
+        ),
     }
-    
     if mode == "taxi":
         result["fare_estimate_sol"] = round(5 + 3.5 * total_km + 0.8 * total_min, 2)
-    
+
+    _cache_set(key, result)
     return result
 
 
 def _single_eta(args: Dict[str, Any]) -> Dict[str, Any]:
     o = args["origin"]
     d = args["destination"]
+    mode = args["mode"]
+
+    key = _cache_key(o["lat"], o["lng"], d["lat"], d["lng"], mode)
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached
+
+    token = os.environ.get("MAPBOX_TOKEN", "")
+    if not token:
+        logger.warning("MAPBOX_TOKEN not set — returning mock ETA")
+        result: Dict[str, Any] = {
+            "duration_minutes": 20.0,
+            "distance_km": 5.0,
+            "mode": mode,
+            "is_mock": True,
+            "warning": "MAPBOX_TOKEN not configured — placeholder data",
+        }
+        _cache_set(key, result)
+        return result
+
     coords = f"{o['lng']},{o['lat']};{d['lng']},{d['lat']}"
-    profile = f"mapbox/{args['mode']}"
-    
+    profile = f"mapbox/{mode}"
+
     url = f"https://api.mapbox.com/directions/v5/{profile}/{coords}"
-    params = {"access_token": MAPBOX_TOKEN, "geometries": "geojson"}
-    
+    params = {"access_token": token, "geometries": "geojson"}
+
     resp = requests.get(url, params=params, timeout=10)
     resp.raise_for_status()
     data = resp.json()
-    
+
     if not data.get("routes"):
         return _error_dict("validation", False, "No route found.")
-    
+
     leg = data["routes"][0]["legs"][0]
-    return {
+    result = {
         "duration_minutes": round(leg["duration"] / 60, 1),
         "distance_km": round(leg["distance"] / 1000, 2),
-        "mode": args["mode"]
+        "mode": mode,
     }
+    _cache_set(key, result)
+    return result
 
 
 def _traffic_conditions(args: Dict[str, Any]) -> Dict[str, Any]:
     district = args["district"]
-    # Mock response for Lima districts (would integrate real traffic API in production)
     severity_map = {
         "Miraflores": "moderate",
         "San Isidro": "moderate",
@@ -218,7 +334,7 @@ def _traffic_conditions(args: Dict[str, Any]) -> Dict[str, Any]:
         "La Molina": "heavy",
         "Barranco": "light",
         "Lince": "heavy",
-        "Jesús María": "moderate"
+        "Jesús María": "moderate",
     }
     sev = severity_map.get(district, "unknown")
     buffers = {"light": 5, "moderate": 15, "heavy": 30, "unknown": 15}
@@ -227,12 +343,51 @@ def _traffic_conditions(args: Dict[str, Any]) -> Dict[str, Any]:
         "traffic_severity": sev,
         "recommended_buffer_minutes": buffers[sev],
         "peak_hours_affected": sev in ["heavy", "moderate"],
-        "source": "mapbox_traffic_estimates"
+        "source": "mapbox_traffic_estimates",
     }
 
 
+# ── Helpers ────────────────────────────────────────────────────────────────────
+
+def _mock_route_response(origin: Dict, destinations: List[Dict], mode: str) -> Dict[str, Any]:
+    """Placeholder route when MAPBOX_TOKEN is not configured."""
+    legs = []
+    all_points = [origin] + destinations
+    for i in range(len(destinations)):
+        legs.append({
+            "from": {
+                "name": all_points[i].get("name", f"Point {i}"),
+                "lat": all_points[i]["lat"],
+                "lng": all_points[i]["lng"],
+            },
+            "to": {
+                "name": destinations[i].get("name", f"Point {i + 1}"),
+                "lat": destinations[i]["lat"],
+                "lng": destinations[i]["lng"],
+            },
+            "duration_minutes": 20.0,
+            "distance_km": 5.0,
+            "traffic_condition": "moderate",
+            "geometry": {},
+        })
+    total_min = sum(l["duration_minutes"] for l in legs)
+    total_km = sum(l["distance_km"] for l in legs)
+    result: Dict[str, Any] = {
+        "mode": mode,
+        "total_duration_minutes": total_min,
+        "total_distance_km": total_km,
+        "legs": legs,
+        "risk_flags": _generate_risk_flags(total_min, destinations),
+        "geometry": {},
+        "is_mock": True,
+        "warning": "MAPBOX_TOKEN not configured — placeholder data",
+    }
+    if mode == "taxi":
+        result["fare_estimate_sol"] = round(5 + 3.5 * total_km + 0.8 * total_min, 2)
+    return result
+
+
 def _classify_traffic(duration_sec: float, distance_m: float) -> str:
-    """Classify traffic based on average speed."""
     if distance_m <= 0:
         return "unknown"
     speed_kmh = (distance_m / duration_sec) * 3.6
@@ -240,8 +395,7 @@ def _classify_traffic(duration_sec: float, distance_m: float) -> str:
         return "light"
     elif speed_kmh > 18:
         return "moderate"
-    else:
-        return "heavy"
+    return "heavy"
 
 
 def _generate_risk_flags(total_min: float, destinations: List[Dict]) -> List[str]:
@@ -250,7 +404,6 @@ def _generate_risk_flags(total_min: float, destinations: List[Dict]) -> List[str
         flags.append("long_drive_exceeds_2h")
     if len(destinations) > 3:
         flags.append("many_stops")
-    # Check for late evening (would use actual appointment times in production)
     return flags
 
 
@@ -259,7 +412,7 @@ def _error_response(category: str, retryable: bool, description: str) -> List[Te
         "isError": True,
         "errorCategory": category,
         "isRetryable": retryable,
-        "description": description
+        "description": description,
     }, indent=2))]
 
 
@@ -268,16 +421,17 @@ def _error_dict(category: str, retryable: bool, description: str) -> Dict[str, A
         "isError": True,
         "errorCategory": category,
         "isRetryable": retryable,
-        "description": description
+        "description": description,
     }
 
 
 if __name__ == "__main__":
     import asyncio
+
     from mcp.server.stdio import stdio_server
-    
+
     async def main():
         async with stdio_server() as (read_stream, write_stream):
             await app.run(read_stream, write_stream, app.create_initialization_options())
-    
+
     asyncio.run(main())

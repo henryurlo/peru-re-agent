@@ -1,0 +1,49 @@
+You are taking over the PeruRE Agent project for Priority 4. Read CLAUDE_HANDOFF.md first for full context.
+
+CURRENT STATE:
+- 63/63 tests passing across coordinator, backend, and priority3 test suites
+- Full FastAPI backend: /health, /api/v1/coordinate, /api/v1/batch, /admin, WebSocket
+- Rate limiting, request logging middleware all working
+- MCP servers currently use mock data
+- MAPBOX_TOKEN and DATABASE_URL are optional (warned but not fatal)
+
+PRIORITY 4 TASKS (do all of these):
+
+1. Implement REAL Mapbox integration in mcp_servers/maps/server.py:
+   - Replace mock route data with actual calls to Mapbox Directions API
+   - Use requests library with MAPBOX_TOKEN from environment
+   - Parse the geojson response and return the same structured format we already use
+   - Add proper error handling for network failures, invalid addresses, rate limits
+   - Keep the same tool signatures so nothing else breaks
+
+2. Add caching layer for Mapbox responses:
+   - Use a simple in-memory dict with TTL (5 minutes) keyed by origin+destination+profile
+   - Cache hits skip the API call entirely
+   - Add a tool clear_route_cache() for manual invalidation
+   - Log cache hit/miss ratio for monitoring
+
+3. Implement REAL WhatsApp Business API integration in mcp_servers/whatsapp/server.py:
+   - Use the WhatsApp Business API Cloud API (or Twilio as fallback if easier)
+   - check_business_hours() stays the same (pure logic)
+   - send_templated_whatsapp() sends actual messages using phone_number_id, access token
+   - Add error handling for invalid numbers, rate limits, auth failures
+   - If no WhatsApp credentials are present, log a warning and return a mock-like response (graceful degradation)
+
+4. Add REAL PostgreSQL connection pooling in mcp_servers/property_db/server.py:
+   - Use psycopg2.pool.ThreadedConnectionPool
+   - Implement actual CRUD for search_properties, get_property_by_id, create_client_profile
+   - If DATABASE_URL is not set, fall back to SQLite in-memory for development
+   - Run the schema.sql on first connection if tables don't exist
+   - Add proper connection cleanup
+
+5. Write backend/test_integration.py with tests that:
+   - Mock external APIs but verify the real parsing/wiring works
+   - Test cache hit/miss behavior
+   - Test graceful degradation when env vars are missing
+   - Verify PostgreSQL schema init works with SQLite fallback
+
+6. Run ALL tests (pytest tests/ backend/ -v) and ensure all pass.
+
+7. Do NOT commit anything. Return a summary of files created/modified.
+
+Work autonomously. Make reasonable architectural decisions. Document in comments.

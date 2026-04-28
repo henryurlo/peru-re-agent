@@ -1,6 +1,29 @@
 version: "3.9"
 
 services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: peru-re-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Override DATABASE_URL so it points to the Docker postgres service,
+      # not the localhost address that may be in .env.
+      - DATABASE_URL=postgresql://peru_re:peru_re_pass@postgres:5432/peru_re_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   postgres:
     image: postgis/postgis:16-3.4
     container_name: peru-re-db
@@ -75,14 +98,8 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  frontend:
-    image: nginx:alpine
-    container_name: peru-re-frontend
-    ports:
-      - "3000:80"
-    volumes:
-      - ./frontend:/usr/share/nginx/html:ro
-    restart: unless-stopped
+# Frontend is served by the backend container at http://localhost:8000/
+# (FastAPI StaticFiles mount). No separate nginx needed.
 
 volumes:
   postgres_data:
