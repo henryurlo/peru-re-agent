@@ -41,15 +41,20 @@ fi
 
 export PYTHONPATH="$PROJECT_DIR"
 
-echo "Starting PeruRE Agent server..."
+echo "Starting PeruRE Agent server (localhost only — use SSH tunnel to access)"
 echo "Project: $PROJECT_DIR"
-echo "Port: 8000"
+echo "Bind: 127.0.0.1:8000 (not exposed to internet)"
 echo ""
-echo "Endpoints:"
+echo "Access from your laptop:"
+echo "  ssh -L 8000:localhost:8000 henry@187.77.216.54"
+echo "  Then open: http://localhost:8000"
+echo ""
+echo "Endpoints (via tunnel):"
 echo "  Health:     http://localhost:8000/health"
-echo "  Coordinate: http://localhost:8000/api/v1/coordinate"
-echo "  Frontend:   http://localhost:8000/"
-echo "  Docs:       http://localhost:8000/docs"
+echo "  Landing:    http://localhost:8000/pitch"
+echo "  Broker:     http://localhost:8000/broker"
+echo "  Proposal:   http://localhost:8000/proposal"
+echo "  Admin:      http://localhost:8000/admin"
 echo ""
 
-exec uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+exec uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
