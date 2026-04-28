@@ -1,0 +1,17 @@
+# /qualify-lead
+# Usage: claude /qualify-lead
+# Qualifies a new lead from Facebook/organic/WhatsApp referral.
+
+When a new lead arrives:
+1. Extract structured profile: name, phone, budget, preferred_districts, financing_status
+2. Calculate financing readiness score (0-100):
+   - Has DNI: +10
+   - Has 3 months pay stubs: +15
+   - Pre-approved by bank: +30
+   - Budget < 20% of property interest: disqualify
+3. Query database for matching properties
+4. Draft welcome WhatsApp with docs checklist (requires broker approval)
+5. Add to broker's pipeline with priority ranking
+6. If score >= 70, flag for immediate follow-up and pre-qualification packet
+
+Use the qualify-lead skill. Store all lead data in PostgreSQL.

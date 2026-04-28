@@ -1,0 +1,13 @@
+# /broker-day-start
+# Usage: claude /broker-day-start
+# Starts the broker's day with route optimization and appointment prep.
+
+Start the broker's day by:
+1. Fetching today's confirmed appointments from the calendar
+2. Fetching broker's current location (or asking if not available)
+3. Running route optimization for all confirmed appointments
+4. Checking each appointment for document readiness
+5. Identifying any unscheduled high-priority leads
+6. Proposing a prioritized daily plan with route map
+
+Use the broker-day-start skill. Confirm with broker before sending any messages.

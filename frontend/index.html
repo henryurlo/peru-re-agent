@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PeruRE — Broker Command Center</title>
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f1117;
+            --card: #1a1d26;
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --accent: #f59e0b;
+            --accent2: #10b981;
+            --danger: #ef4444;
+            --border: #2d3748;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        .topbar { display: flex; justify-content: space-between; align-items: center; padding: 12px 24px; background: var(--card); border-bottom: 1px solid var(--border); }
+        .logo { font-size: 1.4rem; font-weight: 700; color: var(--accent); }
+        .broker-info { display: flex; align-items: center; gap: 12px; font-size: 0.9rem; color: var(--muted); }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent2); }
+        .main { display: flex; flex: 1; overflow: hidden; }
+        .sidebar { width: 360px; background: var(--card); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; }
+        .panel { padding: 16px; border-bottom: 1px solid var(--border); }
+        .panel h3 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 12px; }
+        .route-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 10px; cursor: pointer; transition: border-color 0.2s; }
+        .route-card:hover { border-color: var(--accent); }
+        .route-card .time { font-weight: 700; color: var(--accent); font-size: 0.9rem; }
+        .route-card .client { font-size: 0.95rem; margin: 4px 0; }
+        .route-card .meta { font-size: 0.8rem; color: var(--muted); display: flex; gap: 10px; }
+        .mode-badge { font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; background: rgba(245,158,11,0.15); color: var(--accent); }
+        .action-btn { width: 100%; padding: 12px; border: none; border-radius: 8px; background: var(--accent); color: #000; font-weight: 600; cursor: pointer; margin-top: 8px; }
+        .action-btn:hover { opacity: 0.9; }
+        .action-btn.secondary { background: var(--border); color: var(--text); }
+        .map-wrap { flex: 1; position: relative; }
+        #map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .map-overlay { position: absolute; top: 16px; right: 16px; z-index: 10; background: var(--card); padding: 12px; border-radius: 10px; border: 1px solid var(--border); }
+        .map-overlay select { background: var(--bg); color: var(--text); border: 1px solid var(--border); padding: 6px 10px; border-radius: 6px; font-size: 0.9rem; }
+        .chat-input { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--border); background: var(--bg); }
+        .chat-input input { flex: 1; background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 10px 14px; border-radius: 8px; font-size: 0.95rem; }
+        .chat-input button { padding: 10px 18px; border: none; border-radius: 8px; background: var(--accent2); color: #000; font-weight: 600; cursor: pointer; }
+        .risk { color: var(--danger); font-size: 0.8rem; margin-top: 6px; }
+        .approval-box { background: rgba(245,158,11,0.08); border: 1px solid var(--accent); border-radius: 10px; padding: 12px; margin-top: 10px; }
+        .approval-box p { font-size: 0.85rem; margin-bottom: 8px; }
+        .approval-btns { display: flex; gap: 8px; }
+        .approval-btns button { flex: 1; padding: 8px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; }
+        .btn-yes { background: var(--accent2); color: #000; }
+        .btn-no { background: var(--danger); color: #fff; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <div class="logo">🇵🇪 PeruRE Command Center</div>
+        <div class="broker-info">
+            <span class="status-dot"></span>
+            <span id="broker-name">Juan Pérez — Broker</span>
+            <span id="lima-time">--:--</span>
+        </div>
+    </div>
+    <div class="main">
+        <div class="sidebar">
+            <div class="panel">
+                <h3>Hoy — Ruta Optimizada</h3>
+                <div id="route-list"></div>
+                <button class="action-btn" onclick="optimizeRoutes()">🚗 Optimizar Ruta</button>
+                <button class="action-btn secondary" onclick="reoptimizeAfterCancel()">⚠️ Re-optimizar (Cancelación)</button>
+            </div>
+            <div class="panel">
+                <h3>Modo de Transporte</h3>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button class="mode-badge" onclick="setMode('driving')" id="btn-driving">🚗 Auto</button>
+                    <button class="mode-badge" onclick="setMode('taxi')" id="btn-taxi">🚕 Taxi</button>
+                    <button class="mode-badge" onclick="setMode('transit')" id="btn-transit">🚌 Público</button>
+                </div>
+                <div id="fare-estimate" style="margin-top:10px;font-size:0.85rem;color:var(--muted);"></div>
+            </div>
+            <div class="panel">
+                <h3>Acción Rápida</h3>
+                <div class="chat-input">
+                    <input type="text" id="broker-msg" placeholder='Ej: "Maria G. canceló, estoy en Miraflores"'>
+                    <button onclick="sendToCoordinator()">➡️</button>
+                </div>
+                <div id="approval-queue"></div>
+            </div>
+        </div>
+        <div class="map-wrap">
+            <div id="map"></div>
+            <div class="map-overlay">
+                <select id="layer-select" onchange="changeMapStyle(this.value)">
+                    <option value="mapbox://styles/mapbox/dark-v11">Dark</option>
+                    <option value="mapbox://styles/mapbox/navigation-day-v1">Nav Day</option>
+                    <option value="mapbox://styles/mapbox/satellite-streets-v12">Satellite</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+<script>
+// ------------------------------------------------------------------
+// Configuration
+// ------------------------------------------------------------------
+mapboxgl.accessToken = 'YOUR_MAPBOX_TOKEN'; // Replace with env-injected token
+
+let map;
+let currentMode = 'driving';
+let brokerLocation = [-77.0428, -12.0464]; // Lima center default
+let appointments = [];
+let routeGeoJSON = null;
+
+// ------------------------------------------------------------------
+// Initialization
+// ------------------------------------------------------------------
+document.addEventListener('DOMContentLoaded', () => {
+    initMap();
+    updateClock();
+    setInterval(updateClock, 60000);
+    loadMockAppointments();
+});
+
+function initMap() {
+    map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/dark-v11',
+        center: brokerLocation,
+        zoom: 12,
+        pitch: 45,
+        bearing: -17.6
+    });
+    map.addControl(new mapboxgl.NavigationControl());
+    map.addControl(new mapboxgl.GeolocateControl({
+        positionOptions: { enableHighAccuracy: true },
+        trackUserLocation: true
+    }));
+
+    map.on('load', () => {
+        addBrokerMarker();
+        addAppointmentMarkers();
+    });
+}
+
+function changeMapStyle(url) {
+    map.setStyle(url);
+    map.once('style.load', () => {
+        addBrokerMarker();
+        addAppointmentMarkers();
+        if (routeGeoJSON) drawRoute(routeGeoJSON);
+    });
+}
+
+// ------------------------------------------------------------------
+// Mock Data (Replace with API calls to coordinator)
+// ------------------------------------------------------------------
+function loadMockAppointments() {
+    appointments = [
+        { id: 1, client: 'Maria G.', address: 'Calle Las Flores 120, San Borja', time: '10:00', coords: [-77.0076, -12.1004], status: 'confirmed', type: 'showing' },
+        { id: 2, client: 'Carlos R.', address: 'Av. Larco 450, Miraflores', time: '11:30', coords: [-77.0293, -12.1219], status: 'confirmed', type: 'follow_up' },
+        { id: 3, client: 'Ana L.', address: 'Jr. Los Pinos 88, Surco', time: '14:00', coords: [-76.9716, -12.1388], status: 'tentative', type: 'showing' }
+    ];
+    renderRouteList();
+}
+
+// ------------------------------------------------------------------
+// UI Rendering
+// ------------------------------------------------------------------
+function renderRouteList() {
+    const container = document.getElementById('route-list');
+    container.innerHTML = appointments.map((appt, i) => `
+        <div class="route-card" onclick="flyToAppointment(${i})">
+            <div class="time">${appt.time}</div>
+            <div class="client">${appt.client}</div>
+            <div class="meta">
+                <span>${appt.address}</span>
+                <span class="mode-badge">${appt.type}</span>
+                ${appt.status === 'tentative' ? '<span style="color:var(--accent)">TENTATIVO</span>' : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+function updateClock() {
+    const now = new Date();
+    const lima = new Date(now.toLocaleString('en-US', { timeZone: 'America/Lima' }));
+    const h = String(lima.getHours()).padStart(2, '0');
+    const m = String(lima.getMinutes()).padStart(2, '0');
+    document.getElementById('lima-time').textContent = `${h}:${m} Lima`;
+}
+
+// ------------------------------------------------------------------
+// Map Markers
+// ------------------------------------------------------------------
+function addBrokerMarker() {
+    const el = document.createElement('div');
+    el.style.width = '24px'; el.style.height = '24px';
+    el.style.background = '#10b981'; el.style.borderRadius = '50%';
+    el.style.border = '3px solid #fff'; el.style.boxShadow = '0 0 10px rgba(16,185,129,0.5)';
+    new mapboxgl.Marker(el).setLngLat(brokerLocation).addTo(map);
+}
+
+function addAppointmentMarkers() {
+    appointments.forEach((appt, i) => {
+        const el = document.createElement('div');
+        el.style.width = '32px'; el.style.height = '32px';
+        el.style.background = appt.status === 'confirmed' ? '#f59e0b' : '#64748b';
+        el.style.borderRadius = '50%'; el.style.border = '2px solid #fff';
+        el.style.display = 'flex'; el.style.alignItems = 'center'; el.style.justifyContent = 'center';
+        el.style.color = '#000'; el.style.fontWeight = '700'; el.style.fontSize = '0.8rem';
+        el.textContent = i + 1;
+        new mapboxgl.Marker(el).setLngLat(appt.coords).setPopup(
+            new mapboxgl.Popup().setHTML(`<b>${appt.client}</b><br>${appt.address}<br>${appt.time}`)
+        ).addTo(map);
+    });
+}
+
+function flyToAppointment(index) {
+    const appt = appointments[index];
+    map.flyTo({ center: appt.coords, zoom: 15, pitch: 60 });
+}
+
+// ------------------------------------------------------------------
+// Routing (Mapbox Directions API)
+// ------------------------------------------------------------------
+async function optimizeRoutes() {
+    if (appointments.length < 2) return alert('Mínimo 2 citas para optimizar');
+    
+    // Build waypoints string
+    const coords = [brokerLocation, ...appointments.map(a => a.coords), brokerLocation];
+    const waypoints = coords.map(c => `${c[0]},${c[1]}`).join(';');
+    
+    const profile = currentMode === 'transit' ? 'mapbox/walking' : `mapbox/${currentMode}`;
+    const url = `https://api.mapbox.com/directions/v5/${profile}/${waypoints}?geometries=geojson&overview=full&annotations=duration,distance&access_token=${mapboxgl.accessToken}`;
+    
+    try {
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.routes && data.routes[0]) {
+            routeGeoJSON = data.routes[0].geometry;
+            drawRoute(routeGeoJSON);
+            showRouteStats(data.routes[0]);
+        }
+    } catch (e) {
+        console.error('Routing error:', e);
+        alert('Error obteniendo ruta. Verifica tu token de Mapbox.');
+    }
+}
+
+function drawRoute(geometry) {
+    if (map.getSource('route')) {
+        map.getSource('route').setData({ type: 'Feature', geometry });
+    } else {
+        map.addSource('route', { type: 'geojson', data: { type: 'Feature', geometry } });
+        map.addLayer({
+            id: 'route-line',
+            type: 'line',
+            source: 'route',
+            layout: { 'line-join': 'round', 'line-cap': 'round' },
+            paint: { 'line-color': '#f59e0b', 'line-width': 4, 'line-opacity': 0.9 }
+        });
+    }
+}
+
+function showRouteStats(route) {
+    const min = Math.round(route.duration / 60);
+    const km = (route.distance / 1000).toFixed(1);
+    let fare = '';
+    if (currentMode === 'taxi') {
+        const estimate = (5 + 3.5 * km + 0.8 * min).toFixed(2);
+        fare = ` | Est. Taxi: S/${estimate}`;
+    }
+    document.getElementById('fare-estimate').innerHTML = `⏰ ${min} min | 📏 ${km} km${fare}`;
+}
+
+function setMode(mode) {
+    currentMode = mode;
+    ['driving','taxi','transit'].forEach(m => {
+        document.getElementById(`btn-${m}`).style.opacity = m === mode ? '1' : '0.5';
+    });
+    optimizeRoutes();
+}
+
+// ------------------------------------------------------------------
+// Coordinator Integration
+// ------------------------------------------------------------------
+function sendToCoordinator() {
+    const msg = document.getElementById('broker-msg').value;
+    if (!msg.trim()) return;
+    
+    // In production, POST to coordinator API
+    console.log('Sending to coordinator:', msg);
+    
+    // Simulate coordinator response requiring approval
+    const approvalHTML = `
+        <div class="approval-box">
+            <p><b>Coordinador sugiere:</b> Enviar WhatsApp a <i>Carlos R.</i> proponiendo reunión a las 15:30 en Miraflores.</p>
+            <div class="approval-btns">
+                <button class="btn-yes" onclick="approveAction()">Sí, enviar</button>
+                <button class="btn-no" onclick="rejectAction()">No</button>
+            </div>
+        </div>
+    `;
+    document.getElementById('approval-queue').innerHTML = approvalHTML;
+    document.getElementById('broker-msg').value = '';
+}
+
+function approveAction() {
+    alert('WhatsApp enviado vía Business API');
+    document.getElementById('approval-queue').innerHTML = '';
+}
+function rejectAction() {
+    document.getElementById('approval-queue').innerHTML = '';
+}
+
+function reoptimizeAfterCancel() {
+    // Remove first appointment as demo
+    appointments.shift();
+    renderRouteList();
+    // Clear old route and re-optimize
+    if (map.getSource('route')) map.removeLayer('route-line');
+    optimizeRoutes();
+    
+    // Show simulated alternative leads
+    const panel = document.getElementById('route-list');
+    panel.innerHTML += `
+        <div style="margin-top:12px;padding:10px;background:rgba(16,185,129,0.1);border-radius:8px;border:1px solid var(--accent2);">
+            <div style="font-size:0.8rem;color:var(--accent2);font-weight:700;">OPORTUNIDADES CERCANAS</div>
+            <div style="font-size:0.85rem;margin-top:6px;">• Pedro M. (Surco, 12 min) — Score 82<br>• Laura T. (San Borja, 8 min) — Score 76</div>
+        </div>
+    `;
+}
+</script>
+</body>
+</html>

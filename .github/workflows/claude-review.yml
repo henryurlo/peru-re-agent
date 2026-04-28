@@ -1,0 +1,68 @@
+name: Claude Agent Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  agent-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install anthropic
+
+      - name: Run Claude Code Review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          # Review agent loop implementations for anti-patterns
+          claude -p "Review the agentic loop in agents/coordinator.py. Check:
+          1. stop_reason handling is correct (tool_use vs end_turn)
+          2. Tool results are appended to conversation history
+          3. No natural language parsing for loop termination
+          4. Hooks provide deterministic business rule enforcement
+          Output findings as JSON with severity." \
+            --output-format json \
+            --json-schema '{"type":"object","properties":{"findings":{"type":"array","items":{"type":"object","properties":{"file":{"type":"string"},"issue":{"type":"string"},"severity":{"type":"string","enum":["critical","warning","info"]},"suggestion":{"type":"string"}}}}}}'
+
+      - name: Review MCP Tool Descriptions
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          claude -p "Review all MCP tool definitions in mcp_servers/. For each tool:
+          1. Is the description clear enough to differentiate from similar tools?
+          2. Are input schemas complete with types and descriptions?
+          3. Are error responses structured with errorCategory and isRetryable?
+          4. Is there any functional overlap between tools that should be merged or renamed?
+          Report only new or still-unaddressed issues." \
+            --output-format json
+
+      - name: Validate Claude Code Config
+        run: |
+          # Verify CLAUDE.md hierarchy exists
+          test -f .claude/CLAUDE.md || echo "WARNING: Missing project-level CLAUDE.md"
+          test -d .claude/rules || echo "WARNING: Missing .claude/rules/"
+          test -d .claude/skills || echo "WARNING: Missing .claude/skills/"
+          test -d .claude/commands || echo "WARNING: Missing .claude/commands/"
+
+      - name: Post Review Comments
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const review = fs.readFileSync('review.json', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🧠 Claude Agent Review\n\n\`\`\`json\n${review}\n\`\`\``
+            });

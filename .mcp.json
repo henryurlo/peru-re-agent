@@ -1,0 +1,34 @@
+{
+  "mcpServers": {
+    "peru_maps": {
+      "command": "python",
+      "args": ["mcp_servers/maps/server.py"],
+      "env": {
+        "MAPBOX_TOKEN": "${MAPBOX_TOKEN}",
+        "GOOGLE_MAPS_API_KEY": "${GOOGLE_MAPS_API_KEY}"
+      }
+    },
+    "peru_calendar": {
+      "command": "python",
+      "args": ["mcp_servers/calendar/server.py"],
+      "env": {
+        "DATABASE_URL": "${DATABASE_URL}"
+      }
+    },
+    "peru_whatsapp": {
+      "command": "python",
+      "args": ["mcp_servers/whatsapp/server.py"],
+      "env": {
+        "WHATSAPP_BUSINESS_TOKEN": "${WHATSAPP_BUSINESS_TOKEN}",
+        "WHATSAPP_PHONE_NUMBER_ID": "${WHATSAPP_PHONE_NUMBER_ID}"
+      }
+    },
+    "peru_property_db": {
+      "command": "python",
+      "args": ["mcp_servers/property_db/server.py"],
+      "env": {
+        "DATABASE_URL": "${DATABASE_URL}"
+      }
+    }
+  }
+}

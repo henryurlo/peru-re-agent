@@ -1,0 +1,13 @@
+# /review-routes
+# Usage: claude /review-routes
+# Audits today's proposed routes for efficiency.
+
+Review today's scheduled route and provide:
+1. Total estimated drive time
+2. Number of district crossings (each crossing = potential traffic risk)
+3. Suggestions for clustering (e.g., "Move 3pm Miraflores to 11am, swap with San Borja")
+4. Risk flags (late evening appointments, unconfirmed clients, long drives)
+5. Fuel cost estimate based on total km
+
+Use visual ASCII map or reference Mapbox shared URL for route overview.
+Suggest alternative orderings with time savings.

@@ -1,0 +1,14 @@
+# /handle-cancellation
+# Usage: claude /handle-cancellation --client "Maria G." --reason "no-show"
+# Handles appointment cancellation dynamically.
+
+When a client cancels or no-shows:
+1. Mark the appointment as cancelled in the calendar
+2. Record the reason (no_show, client_request, broker_request, force_majeure)
+3. Re-optimize the remaining route from broker's current location
+4. Query nearby qualified leads from property database
+5. Draft WhatsApp messages to propose new meetings
+6. Present options to broker for approval
+7. If no suitable alternatives found, suggest admin tasks or early wrap
+
+Use the handle-cancellation skill. All outbound messages require broker approval via "yes" / "enviar" / "ok".
