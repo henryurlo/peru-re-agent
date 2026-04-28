@@ -212,6 +212,7 @@ Always return structured JSON matching this schema:
             return {
                 "isError": True,
                 "errorCategory": "validation",
+                "isRetryable": False,
                 "description": f"Unknown tool: {tool_name}"
             }
 
@@ -331,9 +332,14 @@ Structured match list with scores, property details, and broker notes.
             return "## Broker State\nNo active session state loaded.\n"
 
         state = self.broker_state
+        appt_details = "\n".join([
+            f"  - {a.get('time', '?')}: {a.get('client_id', '?')} ({a.get('district', '?')})"
+            for a in state.confirmed_appointments_today
+        ])
         return f"""## BROKER CASE FACTS (persistent across turns)
 - Current location: {state.current_location}
-- Confirmed appointments today: {len(state.confirmed_appointments_today)}
+- Confirmed appointments today ({len(state.confirmed_appointments_today)}):
+{appt_details}
 - Pending proposals: {len(state.pending_proposals)}
 - Active concerns: {state.active_concerns}
 - Session: {self.session_id} | Last updated: {state.last_updated}
@@ -352,7 +358,7 @@ Structured match list with scores, property details, and broker notes.
         return [
             {
                 "name": "routing_agent",
-                "description": "Optimize broker travel routes across multiple Lima districts. Calculates driving, taxi, and transit options with real-time traffic estimates. Use ONLY when broker needs route planning for multiple appointments.",
+                "description": "Optimize broker travel routes across multiple Lima districts for visiting appointments. Calculates driving, taxi, and transit options with real-time traffic estimates. Use ONLY when broker needs route planning to visit multiple appointment locations in sequence.",
                 "input_schema": {
                     "type": "object",
                     "properties": {

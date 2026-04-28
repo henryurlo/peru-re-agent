@@ -1,0 +1,88 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: peru-re-db
+    environment:
+      POSTGRES_USER: peru_re
+      POSTGRES_PASSWORD: peru_re_pass
+      POSTGRES_DB: peru_re_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./mcp_servers/property_db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U peru_re -d peru_re_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mcp-maps:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    container_name: peru-re-mcp-maps
+    environment:
+      - MAPBOX_TOKEN=${MAPBOX_TOKEN}
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+    command: python mcp_servers/maps/server.py
+    ports:
+      - "8001:8000"
+    restart: unless-stopped
+
+  mcp-calendar:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    container_name: peru-re-mcp-calendar
+    environment:
+      - DATABASE_URL=postgresql://peru_re:peru_re_pass@postgres:5432/peru_re_db
+    command: python mcp_servers/calendar/server.py
+    ports:
+      - "8002:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mcp-whatsapp:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    container_name: peru-re-mcp-whatsapp
+    environment:
+      - WHATSAPP_BUSINESS_TOKEN=${WHATSAPP_BUSINESS_TOKEN}
+      - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID}
+    command: python mcp_servers/whatsapp/server.py
+    ports:
+      - "8003:8000"
+    restart: unless-stopped
+
+  mcp-property:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    container_name: peru-re-mcp-property
+    environment:
+      - DATABASE_URL=postgresql://peru_re:peru_re_pass@postgres:5432/peru_re_db
+    command: python mcp_servers/property_db/server.py
+    ports:
+      - "8004:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    image: nginx:alpine
+    container_name: peru-re-frontend
+    ports:
+      - "3000:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

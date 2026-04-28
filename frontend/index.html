@@ -103,7 +103,7 @@
 // ------------------------------------------------------------------
 // Configuration
 // ------------------------------------------------------------------
-mapboxgl.accessToken = 'YOUR_MAPBOX_TOKEN'; // Replace with env-injected token
+mapboxgl.accessToken = window.MAPBOX_TOKEN || localStorage.getItem('mapbox_token') || 'YOUR_MAPBOX_TOKEN_HERE';
 
 let map;
 let currentMode = 'driving';
